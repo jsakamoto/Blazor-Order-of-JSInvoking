@@ -1,0 +1,48 @@
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<div>
+    <button @onclick="OnClickBeginText" disabled="@_disableButton">
+        Begin Test
+    </button>
+</div>
+
+@code
+{
+    private IJSObjectReference? _module;
+
+    private bool _disableButton = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./script.js");
+            _disableButton = false;
+            this.StateHasChanged();
+        }
+    }
+
+    private void OnClickBeginText()
+    {
+        if (_module == null) throw new InvalidOperationException("script.js had not imported.");
+
+        _module.InvokeVoidAsync("delay", 3000)
+            .ConfigureAwait(false)
+            .GetAwaiter()
+            .OnCompleted(() => { Console.WriteLine("Complete delay(3,000) (1st called)."); });
+
+        _module.InvokeVoidAsync("delay", 1000)
+            .ConfigureAwait(false)
+            .GetAwaiter()
+            .OnCompleted(() => { Console.WriteLine("Complete delay(1,000) (2nd called)."); });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (this._module != null)
+        {
+            try { await this._module.DisposeAsync(); } catch (JSDisconnectedException) { }
+        }
+    }
+}
